@@ -1,0 +1,31 @@
+# Chris Work System local/private artifacts
+backups/
+receipts/
+data/archive/
+data/imports/*.jsonl
+data/private_customer_map.csv
+data/*.csv
+exports/
+*.xlsx
+*.zip
+
+# Sensitive local-only files.
+.env
+.env.*
+secrets*
+*.key
+*.pem
+*.secret
+
+# GitHub inbox contains private job/customer/money data.
+# Track github_inbox/chatgpt_updates.jsonl only in a private repo.
+# If this repo is public, uncomment the next line before adding data:
+# github_inbox/*.jsonl
+
+# Python/runtime noise
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# Public-safe templates live under templates/.

@@ -1,0 +1,1 @@
+transaction_id,raw_update_id,transaction_date,customer_id,customer_name,job_id,job_name,transaction_type,description,quantity,rate,amount,reimbursable,paid,payment_method,status,linked_transaction_id,notes
