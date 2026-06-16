@@ -1,6 +1,7 @@
 # Chris Work System local/private artifacts
 backups/
 receipts/
+logs/
 data/archive/
 data/imports/*.jsonl
 data/private_customer_map.csv
