@@ -1,0 +1,1 @@
+backlog_id,raw_update_id,source_update_id,customer_id,customer_name,job_id,job_name,task_description,status,priority,next_action,due_target,preferred_timing,last_mentioned_at,last_updated_at,parked_until,scheduled_date,scheduled_calendar_queue_id,completed_date,notes

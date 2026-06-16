@@ -25,10 +25,12 @@ SHEET_FILES = [
     ("Raw Updates", "raw_updates.csv"),
     ("Duplicate Audit", "duplicate_audit.csv"),
     ("GitHub Sync Log", "github_sync_log.csv"),
+    ("Processed GitHub Inbox", "processed_github_inbox.csv"),
     ("Ledger Transactions", "ledger_transactions.csv"),
     ("Customers", "customers.csv"),
     ("Jobs", "jobs.csv"),
     ("Tasks", "tasks.csv"),
+    ("Outstanding Jobs", "outstanding_jobs.csv"),
     ("Calendar Queue", "calendar_queue.csv"),
     ("Receipts", "receipts.csv"),
 ]
@@ -55,6 +57,7 @@ def dashboard_snapshot() -> dict[str, Any]:
     ledger = read_csv("ledger_transactions.csv")
     raw = read_csv("raw_updates.csv")
     tasks = read_csv("tasks.csv")
+    backlog = read_csv("outstanding_jobs.csv")
     calendar = read_csv("calendar_queue.csv")
     posted = [row for row in ledger if row.get("status") != "void"]
 
@@ -105,17 +108,53 @@ def dashboard_snapshot() -> dict[str, Any]:
         row for row in tasks if row.get("status") in {"open", "scheduled"}
     ]
     upcoming = []
+    upcoming_keys = set()
     for row in calendar:
         if row.get("status") not in {"queued", "created_by_chatgpt"}:
             continue
         try:
             if date.fromisoformat(row.get("date", "")) >= today:
                 upcoming.append(row)
+                upcoming_keys.add((
+                    row.get("customer_id", ""),
+                    row.get("job_id", ""),
+                    row.get("customer_name", "").strip().lower(),
+                    row.get("job_name", "").strip().lower(),
+                ))
         except ValueError:
             continue
     reviews = [row for row in raw if row.get("validation_status") == "needs_review"]
     validation_errors = [
         row for row in raw if row.get("validation_errors", "").strip()
+    ]
+
+    inactive_backlog_statuses = {"scheduled", "completed", "cancelled"}
+
+    def parked_until_future(row: dict[str, str]) -> bool:
+        parked_until = row.get("parked_until", "").strip()
+        if not parked_until:
+            return False
+        try:
+            return date.fromisoformat(parked_until[:10]) > today
+        except ValueError:
+            return False
+
+    def matching_future_calendar(row: dict[str, str]) -> bool:
+        key = (
+            row.get("customer_id", ""),
+            row.get("job_id", ""),
+            row.get("customer_name", "").strip().lower(),
+            row.get("job_name", "").strip().lower(),
+        )
+        if key in upcoming_keys:
+            return True
+        return bool(row.get("scheduled_calendar_queue_id", "").strip())
+
+    outstanding_backlog = [
+        row for row in backlog
+        if row.get("status", "").strip().lower() not in inactive_backlog_statuses
+        and not parked_until_future(row)
+        and not matching_future_calendar(row)
     ]
 
     return {
@@ -126,6 +165,7 @@ def dashboard_snapshot() -> dict[str, Any]:
             ["Expenses/materials not reimbursed", round(unreimbursed_expenses, 2), "currency"],
             ["Payments received", round(payments_received, 2), "currency"],
             ["Open tasks", len(open_tasks), "integer"],
+            ["Outstanding / unscheduled jobs", len(outstanding_backlog), "integer"],
             ["Upcoming scheduled jobs", len(upcoming), "integer"],
             ["Raw updates needing review", len(reviews), "integer"],
             ["Validation errors", len(validation_errors), "integer"],
@@ -145,6 +185,28 @@ def dashboard_snapshot() -> dict[str, Any]:
         "open_tasks": [
             [row.get("customer_name"), row.get("job_name"), row.get("task"), row.get("due_date"), row.get("status")]
             for row in open_tasks
+        ],
+        "outstanding_backlog": [
+            [
+                " - ".join(part for part in (row.get("customer_name"), row.get("job_name")) if part),
+                row.get("task_description"),
+                row.get("status"),
+                row.get("priority"),
+                row.get("next_action"),
+                row.get("due_target") or row.get("preferred_timing"),
+                row.get("last_updated_at"),
+                row.get("notes"),
+            ]
+            for row in sorted(
+                outstanding_backlog,
+                key=lambda item: (
+                    {"high": 0, "medium-high": 1, "medium": 2, "low-medium": 3, "low": 4}.get(
+                        item.get("priority", "").lower(), 5
+                    ),
+                    item.get("customer_name", ""),
+                    item.get("job_name", ""),
+                ),
+            )
         ],
         "upcoming": [
             [

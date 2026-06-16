@@ -14,10 +14,12 @@ CLEAR_CSVS = [
     "ledger_transactions.csv",
     "jobs.csv",
     "tasks.csv",
+    "outstanding_jobs.csv",
     "calendar_queue.csv",
     "receipts.csv",
     "duplicate_audit.csv",
     "github_sync_log.csv",
+    "processed_github_inbox.csv",
 ]
 
 

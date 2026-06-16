@@ -15,6 +15,18 @@ from work_system import (
     write_csv,
 )
 
+BACKLOG_STATUSES = {
+    "lead",
+    "needs follow-up",
+    "needs scheduling",
+    "scheduled",
+    "in progress",
+    "blocked",
+    "completed",
+    "cancelled",
+}
+BACKLOG_PRIORITIES = {"high", "medium-high", "medium", "low-medium", "low", ""}
+
 
 def run_validation() -> int:
     ensure_layout()
@@ -23,6 +35,7 @@ def run_validation() -> int:
     ledger = read_csv("ledger_transactions.csv")
     calendar = read_csv("calendar_queue.csv")
     tasks = read_csv("tasks.csv")
+    backlog = read_csv("outstanding_jobs.csv")
     packets = {
         deterministic_update_id(packet): packet
         for _, packet, parse_error in parse_jsonl()
@@ -46,7 +59,7 @@ def run_validation() -> int:
         ]
         packet = packets.get(raw.get("update_id", ""), {})
         _, _, customer_error = normalize_customer(raw.get("customer"), customers)
-        if raw.get("update_type") == "general_note" and customer_error == "missing customer":
+        if raw.get("update_type") in {"general_note", "lead", "follow_up", "backlog", "backlog_update"} and customer_error == "missing customer":
             customer_error = ""
         errors = existing + packet_validation_errors(packet or raw, customers, customer_error)
 
@@ -98,10 +111,39 @@ def run_validation() -> int:
         if row.get("status") in {"open", "scheduled"}
     ]
     duplicate_open_tasks = sum(count - 1 for count in Counter(open_task_keys).values() if count > 1)
+
+    backlog_errors: list[str] = []
+    active_backlog_keys = []
+    for row in backlog:
+        label = row.get("backlog_id") or row.get("task_description") or "(unknown backlog row)"
+        status = row.get("status", "").strip().lower()
+        priority = row.get("priority", "").strip().lower()
+        if not row.get("task_description", "").strip():
+            backlog_errors.append(f"{label}: missing task_description")
+        if status not in BACKLOG_STATUSES:
+            backlog_errors.append(f"{label}: invalid status '{row.get('status', '')}'")
+        if priority not in BACKLOG_PRIORITIES:
+            backlog_errors.append(f"{label}: invalid priority '{row.get('priority', '')}'")
+        if status not in {"scheduled", "completed", "cancelled"}:
+            active_backlog_keys.append((
+                row.get("customer_id") or row.get("customer_name", "").strip().lower(),
+                row.get("job_id") or row.get("job_name", "").strip().lower(),
+                row.get("task_description", "").strip().lower(),
+            ))
+    duplicate_active_backlog = sum(
+        count - 1 for count in Counter(active_backlog_keys).values() if count > 1
+    )
+
     write_csv(DATA_DIR / "raw_updates.csv", raw_rows)
     print(f"Validation scanned {len(raw_rows)} raw updates and {len(ledger)} transactions.")
     print(f"Flagged raw updates: {flagged}; duplicate open tasks: {duplicate_open_tasks}.")
-    return flagged
+    print(
+        f"Backlog rows: {len(backlog)}; backlog errors: {len(backlog_errors)}; "
+        f"duplicate active backlog rows: {duplicate_active_backlog}."
+    )
+    for error in backlog_errors:
+        print(f"Backlog validation error: {error}")
+    return flagged + len(backlog_errors) + duplicate_active_backlog
 
 
 if __name__ == "__main__":

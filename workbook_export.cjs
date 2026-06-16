@@ -151,19 +151,26 @@ function addDashboard(workbook, dashboard) {
     tasksStart + dashboard.open_tasks.length + 2,
   );
   setMatrix(sheet, detailStart - 1, 0, [
+    ["Outstanding / Unscheduled Jobs", "Task Description", "Status", "Priority", "Next Action", "Due / Timing", "Last Updated", "Notes"],
+    ...dashboard.outstanding_backlog,
+  ]);
+  styleSection(sheet.getRange(`A${detailStart}:H${detailStart}`));
+
+  const upcomingStart = detailStart + dashboard.outstanding_backlog.length + 3;
+  setMatrix(sheet, upcomingStart - 1, 0, [
     ["Upcoming Scheduled Jobs", "Start", "End", "Customer", "Title", "Location", "Status"],
     ...dashboard.upcoming,
   ]);
-  styleSection(sheet.getRange(`A${detailStart}:G${detailStart}`));
+  styleSection(sheet.getRange(`A${upcomingStart}:G${upcomingStart}`));
 
-  const reviewStart = detailStart + dashboard.upcoming.length + 3;
+  const reviewStart = upcomingStart + dashboard.upcoming.length + 3;
   setMatrix(sheet, reviewStart - 1, 0, [
     ["Raw Updates Needing Review", "Customer", "Type", "Validation Errors"],
     ...dashboard.review_rows,
   ]);
   styleHeader(sheet.getRange(`A${reviewStart}:D${reviewStart}`), COLORS.red);
 
-  const widths = [28, 16, 16, 24, 24, 24, 34, 16];
+  const widths = [30, 38, 16, 14, 34, 22, 22, 38];
   widths.forEach((width, index) => {
     sheet.getRangeByIndexes(0, index, Math.max(reviewStart + dashboard.review_rows.length, 20), 1).format.columnWidth = width;
   });

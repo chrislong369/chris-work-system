@@ -47,6 +47,14 @@ SCHEMAS: dict[str, list[str]] = {
         "job_name", "task", "due_date", "priority", "status", "created_at",
         "completed_at", "notes",
     ],
+    "outstanding_jobs.csv": [
+        "backlog_id", "raw_update_id", "source_update_id", "customer_id",
+        "customer_name", "job_id", "job_name", "task_description", "status",
+        "priority", "next_action", "due_target", "preferred_timing",
+        "last_mentioned_at", "last_updated_at", "parked_until",
+        "scheduled_date", "scheduled_calendar_queue_id", "completed_date",
+        "notes",
+    ],
     "calendar_queue.csv": [
         "calendar_queue_id", "raw_update_id", "customer_id", "customer_name",
         "job_id", "job_name", "title", "date", "start_time", "end_time",
@@ -66,11 +74,15 @@ SCHEMAS: dict[str, list[str]] = {
     "github_sync_log.csv": [
         "sync_id", "synced_at", "update_id", "source", "action", "notes",
     ],
+    "processed_github_inbox.csv": [
+        "processed_id", "processed_at", "inbox_hash", "update_id", "source",
+        "line_number", "action", "status", "notes",
+    ],
 }
 
 SEED_CUSTOMERS = [
     ("Larry", "35"),
-    ("Funkel", "40"),
+    ("Funfgeld", "40"),
     ("Suzanne", "40"),
     ("Collins", "40"),
     ("Nate", "40"),
@@ -80,15 +92,18 @@ SEED_CUSTOMERS = [
 ]
 
 CUSTOMER_ALIASES = {
-    "funkels": "Funkel",
-    "funkel's": "Funkel",
-    "fungle": "Funkel",
-    "funko": "Funkel",
+    "funkel": "Funfgeld",
+    "funkgeld": "Funfgeld",
+    "funkels": "Funfgeld",
+    "funkel's": "Funfgeld",
+    "funfgeld's": "Funfgeld",
+    "fungle": "Funfgeld",
+    "funko": "Funfgeld",
 }
 
 SUPPORTED_UPDATE_TYPES = {
     "job_update", "expense", "payment", "task", "schedule", "correction",
-    "general_note",
+    "general_note", "lead", "follow_up", "backlog", "backlog_update",
 }
 
 SIDE_WORK_CALENDAR_ID = (
@@ -217,7 +232,7 @@ def deterministic_update_id(packet: dict[str, Any]) -> str:
     return stable_id(
         "update",
         packet.get("created_at"),
-        packet.get("customer"),
+        packet.get("customer") or packet.get("customer_name") or packet.get("customer_code"),
         packet.get("update_type"),
         packet.get("work_date"),
         packet.get("raw_text"),
@@ -251,7 +266,10 @@ def packet_validation_errors(
     update_type = clean_cell(packet.get("update_type")).strip()
     if update_type not in SUPPORTED_UPDATE_TYPES:
         errors.append(f"unsupported update_type: {update_type or '(blank)'}")
-    if update_type != "general_note" and not clean_cell(packet.get("customer")).strip():
+    if (
+        update_type not in {"general_note", "lead", "follow_up", "backlog", "backlog_update"}
+        and not clean_cell(packet.get("customer") or packet.get("customer_name")).strip()
+    ):
         errors.append("missing customer")
     if customer_error:
         errors.append(customer_error)
